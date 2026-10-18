@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="0" fill="#15803d"/>
+  <!-- jar -->
+  <rect x="166" y="118" width="180" height="44" rx="14" fill="#fef3c7"/>
+  <rect x="146" y="150" width="220" height="250" rx="46" fill="#ffffff"/>
+  <!-- label with barcode -->
+  <rect x="176" y="222" width="160" height="104" rx="14" fill="#dcfce7"/>
+  <g fill="#14532d">
+    <rect x="198" y="240" width="8" height="68"/>
+    <rect x="214" y="240" width="4" height="68"/>
+    <rect x="226" y="240" width="12" height="68"/>
+    <rect x="246" y="240" width="4" height="68"/>
+    <rect x="258" y="240" width="8" height="68"/>
+    <rect x="274" y="240" width="4" height="68"/>
+    <rect x="286" y="240" width="12" height="68"/>
+    <rect x="306" y="240" width="8" height="68"/>
+  </g>
+</svg>
