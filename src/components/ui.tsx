@@ -4,13 +4,14 @@ export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
 }
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent'
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand-600 text-white active:bg-brand-700 disabled:bg-stone-300',
   secondary: 'bg-white text-stone-800 border border-stone-200 active:bg-stone-100',
   ghost: 'text-stone-700 active:bg-stone-100',
   danger: 'bg-white text-red-600 border border-red-200 active:bg-red-50',
+  accent: 'bg-amber-50 text-amber-900 border border-amber-300 active:bg-amber-100',
 }
 
 export function Button({

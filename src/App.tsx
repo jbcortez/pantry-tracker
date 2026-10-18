@@ -1,7 +1,8 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ToastProvider } from './components/Toast'
 import { cx } from './components/ui'
-import { AppContext, type AppState } from './lib/appContext'
+import { AppContext, type AppState, useApp } from './lib/appContext'
 import { resolveCategories } from './lib/categories'
 import { db } from './lib/db'
 import {
@@ -18,6 +19,7 @@ import type { Household } from './lib/types'
 import { Kitchen } from './screens/Kitchen'
 import { Scan } from './screens/Scan'
 import { Settings } from './screens/Settings'
+import { Shopping } from './screens/Shopping'
 import { Onboarding, SignIn } from './screens/Welcome'
 
 type Phase =
@@ -101,7 +103,7 @@ export default function App() {
 
   const signOut = useCallback(async () => {
     // Don't leave the household's data on a shared device.
-    await Promise.all([db.products.clear(), db.inventory_units.clear(), db.outbox.clear(), db.meta.clear()])
+    await Promise.all(db.tables.map((t) => t.clear()))
     cacheHousehold(null)
     await supabase?.auth.signOut()
     setPhase({ kind: 'signin' })
@@ -144,21 +146,34 @@ export default function App() {
   )
 }
 
-type Tab = 'kitchen' | 'scan' | 'settings'
+type Tab = 'kitchen' | 'list' | 'scan' | 'settings'
 
 function Main() {
+  const { household } = useApp()
   const [tab, setTab] = useState<Tab>('kitchen')
+  const listCount =
+    useLiveQuery(
+      () =>
+        db.shopping_items
+          .where('household_id')
+          .equals(household.id)
+          .filter((i) => !i.deleted_at && !i.checked_at)
+          .count(),
+      [household.id],
+    ) ?? 0
   return (
     <div className="flex h-full flex-col">
       <main className="flex-1 overflow-y-auto">
         {tab === 'kitchen' && <Kitchen onScan={() => setTab('scan')} />}
         {/* Mounted only while visible, so the camera turns off when you leave. */}
+        {tab === 'list' && <Shopping />}
         {tab === 'scan' && <Scan />}
         {tab === 'settings' && <Settings />}
       </main>
       <nav className="safe-bottom border-t border-stone-200 bg-white">
         <div className="mx-auto flex max-w-lg items-end justify-around px-2 pt-1.5 pb-1">
           <TabButton active={tab === 'kitchen'} onClick={() => setTab('kitchen')} icon="🧺" label="Kitchen" />
+          <TabButton active={tab === 'list'} onClick={() => setTab('list')} icon="🛒" label="List" badge={listCount} />
           <button
             type="button"
             onClick={() => setTab('scan')}
@@ -178,15 +193,35 @@ function Main() {
   )
 }
 
-function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  badge,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: string
+  label: string
+  badge?: number
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cx('flex w-20 flex-col items-center py-1 text-xs', active ? 'font-semibold text-brand-700' : 'text-stone-500')}
+      className={cx(
+        'relative flex w-16 flex-col items-center py-1 text-xs',
+        active ? 'font-semibold text-brand-700' : 'text-stone-500',
+      )}
     >
       <span className={cx('text-xl', !active && 'opacity-60 grayscale')}>{icon}</span>
       {label}
+      {!!badge && (
+        <span className="absolute top-0 right-2 min-w-4 rounded-full bg-brand-600 px-1 text-[10px] leading-4 font-semibold text-white">
+          {badge}
+        </span>
+      )}
     </button>
   )
 }

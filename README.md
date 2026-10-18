@@ -12,7 +12,7 @@ what you already have.
 | Phase | |
 |---|---|
 | 1. Inventory & scanning | ✅ Built |
-| 2. Shopping list | Planned |
+| 2. Shopping list | ✅ Built |
 | 3. Recipes | Planned |
 
 ## What's in Phase 1
@@ -26,17 +26,26 @@ what you already have.
   expiring within 3 days.
 - **Undo on everything**, shared household with invite links, **works offline**.
 
+## What's in Phase 2
+
+- **Shared shopping list** grouped by aisle, with suggestions from things you've bought before
+  and "Have: …" next to each item.
+- **Staples** (★): put themselves on the list when they run out or the last one is down to ¼.
+- **Ran out** prompt when a non-staple hits zero.
+- Checking off doesn't touch the inventory; scanning groceries in ticks list items off.
+
 ## Code map
 
 | Path | |
 |---|---|
 | `src/lib/inventory.ts` | Quantity model: pure operations on packages |
+| `src/lib/shopping.ts` | Staple / low-stock / list rules |
 | `src/lib/categories.ts`, `shelfLife.ts` | Auto category / location / use-by rules |
 | `src/lib/lookup.ts` | Barcode lookup chain |
 | `src/lib/store.ts`, `sync.ts`, `db.ts` | Local-first storage, outbox, Supabase sync |
 | `src/components/Scanner.tsx` | Camera + barcode decoding |
 | `src/screens/` | Kitchen, Scan, Settings, sign-in |
-| `supabase/schema.sql` | Database tables and access rules |
+| `supabase/schema.sql` | Database tables and access rules. **Re-run it in the Supabase SQL Editor after each new phase.** |
 | `api/upc.ts` | Vercel function proxying UPCitemdb |
 
 ```bash
