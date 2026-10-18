@@ -4,6 +4,7 @@ import { ToastProvider } from './components/Toast'
 import { cx } from './components/ui'
 import { AppContext, type AppState, useApp } from './lib/appContext'
 import { resolveCategories } from './lib/categories'
+import { CookingContext, type CookingState } from './lib/cooking'
 import { db } from './lib/db'
 import {
   cachedHousehold,
@@ -15,9 +16,10 @@ import {
 } from './lib/household'
 import { supabase } from './lib/supabase'
 import { startSync } from './lib/sync'
-import type { Household } from './lib/types'
+import type { Household, RecipeDraft } from './lib/types'
 import { Kitchen } from './screens/Kitchen'
 import { Scan } from './screens/Scan'
+import { Recipes } from './screens/Recipes'
 import { Settings } from './screens/Settings'
 import { Shopping } from './screens/Shopping'
 import { Onboarding, SignIn } from './screens/Welcome'
@@ -124,7 +126,8 @@ export default function App() {
     [phase, email, setHousehold, signOut],
   )
 
-  if (phase.kind === 'loading') return <div className="flex h-full items-center justify-center text-stone-500">Loading…</div>
+  if (phase.kind === 'loading')
+    return <div className="flex h-full items-center justify-center text-stone-500">Loading…</div>
   if (phase.kind === 'signin') return <SignIn hasInvite={hasInvite} />
   if (phase.kind === 'onboarding') return <Onboarding email={email} onDone={() => void resolve()} />
   if (phase.kind === 'error')
@@ -146,11 +149,23 @@ export default function App() {
   )
 }
 
-type Tab = 'kitchen' | 'list' | 'scan' | 'settings'
+type Tab = 'kitchen' | 'list' | 'scan' | 'recipes' | 'settings'
 
 function Main() {
   const { household } = useApp()
   const [tab, setTab] = useState<Tab>('kitchen')
+  const [cookRecipe, setCookRecipe] = useState<RecipeDraft | null>(null)
+  const cooking: CookingState = useMemo(
+    () => ({
+      recipe: cookRecipe,
+      start: (r) => {
+        setCookRecipe(r)
+        setTab('scan')
+      },
+      stop: () => setCookRecipe(null),
+    }),
+    [cookRecipe],
+  )
   const listCount =
     useLiveQuery(
       () =>
@@ -162,34 +177,44 @@ function Main() {
       [household.id],
     ) ?? 0
   return (
-    <div className="flex h-full flex-col">
-      <main className="flex-1 overflow-y-auto">
-        {tab === 'kitchen' && <Kitchen onScan={() => setTab('scan')} />}
-        {/* Mounted only while visible, so the camera turns off when you leave. */}
-        {tab === 'list' && <Shopping />}
-        {tab === 'scan' && <Scan />}
-        {tab === 'settings' && <Settings />}
-      </main>
-      <nav className="safe-bottom border-t border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-lg items-end justify-around px-2 pt-1.5 pb-1">
-          <TabButton active={tab === 'kitchen'} onClick={() => setTab('kitchen')} icon="🧺" label="Kitchen" />
-          <TabButton active={tab === 'list'} onClick={() => setTab('list')} icon="🛒" label="List" badge={listCount} />
-          <button
-            type="button"
-            onClick={() => setTab('scan')}
-            className={cx(
-              '-mt-6 flex h-16 w-16 flex-col items-center justify-center rounded-full text-white shadow-lg ring-4 ring-[#f6f7f5]',
-              tab === 'scan' ? 'bg-brand-700' : 'bg-brand-600',
-            )}
-            aria-label="Scan"
-          >
-            <span className="text-2xl leading-none">▦</span>
-            <span className="text-[10px] font-semibold">Scan</span>
-          </button>
-          <TabButton active={tab === 'settings'} onClick={() => setTab('settings')} icon="⚙️" label="Settings" />
-        </div>
-      </nav>
-    </div>
+    <CookingContext.Provider value={cooking}>
+      <div className="flex h-full flex-col">
+        <main className="flex-1 overflow-y-auto">
+          {tab === 'kitchen' && <Kitchen onScan={() => setTab('scan')} />}
+          {tab === 'list' && <Shopping />}
+          {/* Mounted only while visible, so the camera turns off when you leave. */}
+          {tab === 'scan' && <Scan />}
+          {tab === 'recipes' && <Recipes />}
+          {tab === 'settings' && <Settings />}
+        </main>
+        <nav className="safe-bottom border-t border-stone-200 bg-white">
+          <div className="mx-auto flex max-w-lg items-end justify-around px-2 pt-1.5 pb-1">
+            <TabButton active={tab === 'kitchen'} onClick={() => setTab('kitchen')} icon="🧺" label="Kitchen" />
+            <TabButton
+              active={tab === 'list'}
+              onClick={() => setTab('list')}
+              icon="🛒"
+              label="List"
+              badge={listCount}
+            />
+            <button
+              type="button"
+              onClick={() => setTab('scan')}
+              className={cx(
+                '-mt-6 flex h-16 w-16 flex-col items-center justify-center rounded-full text-white shadow-lg ring-4 ring-[#f6f7f5]',
+                tab === 'scan' ? 'bg-brand-700' : 'bg-brand-600',
+              )}
+              aria-label="Scan"
+            >
+              <span className="text-2xl leading-none">▦</span>
+              <span className="text-[10px] font-semibold">Scan</span>
+            </button>
+            <TabButton active={tab === 'recipes'} onClick={() => setTab('recipes')} icon="📖" label="Recipes" />
+            <TabButton active={tab === 'settings'} onClick={() => setTab('settings')} icon="⚙️" label="Settings" />
+          </div>
+        </nav>
+      </div>
+    </CookingContext.Provider>
   )
 }
 
@@ -211,14 +236,14 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={cx(
-        'relative flex w-16 flex-col items-center py-1 text-xs',
+        'relative flex w-14 flex-col items-center py-1 text-[11px]',
         active ? 'font-semibold text-brand-700' : 'text-stone-500',
       )}
     >
       <span className={cx('text-xl', !active && 'opacity-60 grayscale')}>{icon}</span>
       {label}
       {!!badge && (
-        <span className="absolute top-0 right-2 min-w-4 rounded-full bg-brand-600 px-1 text-[10px] leading-4 font-semibold text-white">
+        <span className="absolute top-0 right-1 min-w-4 rounded-full bg-brand-600 px-1 text-[10px] leading-4 font-semibold text-white">
           {badge}
         </span>
       )}

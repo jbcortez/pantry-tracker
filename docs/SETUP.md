@@ -1,7 +1,8 @@
 # Setup: getting Pantry onto your phones
 
 About 15 minutes, once. You need two free accounts: **Supabase** (the shared database)
-and **Vercel** (the website host). After this, every update to the code goes live on its own.
+and **Vercel** (the website host), plus an **Anthropic API key** for recipe suggestions
+(step 5; pay-as-you-go). After this, every update to the code goes live on its own.
 
 > Without any setup, the app still runs in **device-only mode**: everything works, but
 > data lives only on that one device and isn't shared or backed up.
@@ -74,6 +75,25 @@ Save. This lets the "tap here to sign in" link in the email return to your app.
 
 The first time you open Scan, allow camera access.
 
+## 5. Recipes: Anthropic API key
+
+Recipe suggestions and recipe import use Claude. Everything else works without this.
+
+1. Go to **https://console.anthropic.com** → sign up → **Billing** → add a small amount of
+   credit. Each "Suggest recipes" costs roughly 5–20¢; importing a recipe costs less.
+2. **API Keys → Create Key**, name it `pantry`, and copy it.
+3. In Vercel → your project → **Settings → Environment Variables**, add
+   `ANTHROPIC_API_KEY` with that value. (No `VITE_` prefix: it must stay on the server.)
+4. **Deployments** → ⋯ on the latest → **Redeploy**.
+
+Only signed-in members of your household can use it, so the key can't be spent by strangers.
+
+## Updating
+
+When a new version adds database tables (the README will say so), open Supabase → **SQL
+Editor**, paste the latest [`supabase/schema.sql`](../supabase/schema.sql) again and click
+**Run**. It's safe to re-run; it only adds what's missing.
+
 ---
 
 ## Good to know
@@ -91,8 +111,8 @@ The first time you open Scan, allow camera access.
 
 ```bash
 npm install
-cp .env.example .env.local   # optional: fill in the two Supabase values
-npm run dev                  # http://localhost:5173
+cp .env.example .env.local   # optional: Supabase values, ANTHROPIC_API_KEY for recipes
+npm run dev                  # http://localhost:5173 (also serves /api/*)
 npm test                     # unit tests
 ```
 

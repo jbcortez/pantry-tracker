@@ -150,7 +150,11 @@ scanning again adds another.
 - **"Cook this"** — opens Cooking mode preloaded with that recipe's ingredients as a
   checklist to deduct.
 - Household preference notes (dietary rules, dislikes) live in Settings; none today.
-- The AI key lives server-side only.
+- The AI key lives server-side only, and the endpoints require a signed-in household member.
+- Model: Claude Opus 5.5 with structured output, so recipes always parse; server-side
+  fallback is enabled so a declined request is retried on another model automatically.
+- Import reads schema.org Recipe data when the page has it (most recipe sites do), else the
+  page text; pasted text works for sites that block it.
 
 ## 10. Tech stack
 

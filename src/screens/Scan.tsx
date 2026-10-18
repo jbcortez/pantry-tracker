@@ -4,12 +4,14 @@ import { ProductForm, type NewProductInput } from '../components/ProductForm'
 import { QuickAddSheet } from '../components/QuickAddSheet'
 import { Scanner } from '../components/Scanner'
 import { useToast } from '../components/Toast'
-import { Button, inputClass, Segmented, Sheet } from '../components/ui'
+import { Button, cx, inputClass, Segmented, Sheet } from '../components/ui'
 import { addProductToList, consume, createProduct, liveUnitsOf, putAway, type Result, type UseChoice } from '../lib/actions'
 import { useApp } from '../lib/appContext'
+import { useCooking } from '../lib/cooking'
 import { describeQuantity, levelLabel, LEVELS, summarize } from '../lib/inventory'
 import { findKnownProduct, lookupBarcode, normalizeBarcode } from '../lib/lookup'
-import type { Product, ProductDraft } from '../lib/types'
+import { ingredientLine, matchRecipe } from '../lib/recipes'
+import type { Product, ProductDraft, RecipeDraft } from '../lib/types'
 import { soonestFirst, useKitchen } from '../lib/useKitchen'
 
 type Mode = 'away' | 'cook'
@@ -36,7 +38,11 @@ export function Scan() {
   const { household } = useApp()
   const kitchen = useKitchen(household.id)
   const toast = useToast()
-  const [mode, setModeState] = useState<Mode>(loadMode)
+  const cooking = useCooking()
+  // "Cook this" always opens in Cooking mode.
+  const [mode, setModeState] = useState<Mode>(() => (cooking.recipe ? 'cook' : loadMode()))
+  /** Products used this session, to tick off the recipe checklist. */
+  const [used, setUsed] = useState<Set<string>>(new Set())
   const [sheet, setSheetState] = useState<SheetState | null>(null)
   // Refs so scanner callbacks see the latest state, not the render they were created in.
   const sheetRef = useRef<SheetState | null>(null)
@@ -66,6 +72,7 @@ export function Scan() {
   }
 
   const announceUse = (product: Product, r: Result, verb: string) => {
+    setUsed((s) => new Set(s).add(product.id))
     const tail = r.listed ? 'added to shopping list' : r.remaining ? `${r.remaining} left` : 'all gone'
     const text = `${verb} ${product.name} · ${tail}`
     toast({
@@ -185,6 +192,15 @@ export function Scan() {
           </div>
         ) : (
           <>
+            {cooking.recipe && (
+              <RecipeChecklist
+                recipe={cooking.recipe}
+                kitchen={kitchen}
+                used={used}
+                onUse={(p) => void useUp(p)}
+                onDone={cooking.stop}
+              />
+            )}
             <KitchenChips kitchen={kitchen} onPick={(p) => void useUp(p)} />
             <Button className="w-full" onClick={() => setSheet({ kind: 'type' })}>
               ⌨︎ Type barcode
@@ -315,6 +331,56 @@ function LevelChoices({
         </div>
       )}
     </div>
+  )
+}
+
+/** "Cook this": the recipe's ingredients, each one tap (or one scan) to deduct. */
+function RecipeChecklist({
+  recipe,
+  kitchen,
+  used,
+  onUse,
+  onDone,
+}: {
+  recipe: RecipeDraft
+  kitchen: ReturnType<typeof useKitchen>
+  used: Set<string>
+  onUse: (p: Product) => void
+  onDone: () => void
+}) {
+  const matched = matchRecipe(recipe, kitchen)
+  return (
+    <section className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-200/70">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Cooking</div>
+          <div className="truncate font-semibold">{recipe.title}</div>
+        </div>
+        <Button variant="ghost" onClick={onDone}>
+          Done
+        </Button>
+      </div>
+      <ul className="divide-y divide-stone-100">
+        {matched.map((m, i) => {
+          const done = !!m.product && used.has(m.product.id)
+          const usable = m.product && (m.state === 'have' || m.state === 'low')
+          return (
+            <li key={i} className="flex items-center gap-2 py-2">
+              <span className={cx('flex-1 text-sm', done && 'text-stone-400 line-through')}>
+                <span className="font-medium">{ingredientLine(m.ingredient).lead}</span> {ingredientLine(m.ingredient).rest}
+              </span>
+              {done ? (
+                <span className="text-sm text-brand-700">✓ Used</span>
+              ) : usable ? (
+                <Button onClick={() => onUse(m.product!)}>Use</Button>
+              ) : (
+                <span className="text-xs text-stone-400">{m.state === 'staple' ? 'Basic' : 'Not in kitchen'}</span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 

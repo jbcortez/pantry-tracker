@@ -13,7 +13,7 @@ what you already have.
 |---|---|
 | 1. Inventory & scanning | ✅ Built |
 | 2. Shopping list | ✅ Built |
-| 3. Recipes | Planned |
+| 3. Recipes | ✅ Built |
 
 ## What's in Phase 1
 
@@ -34,12 +34,25 @@ what you already have.
 - **Ran out** prompt when a non-staple hits zero.
 - Checking off doesn't touch the inventory; scanning groceries in ticks list items off.
 
+## What's in Phase 3
+
+- **"What can I make?"**: Claude suggests 3–5 recipes from what's in the kitchen, with the
+  expiring items first. Options for time, servings and cuisine, and household preferences
+  from Settings are always followed.
+- **Recipe box:** save suggestions or import from a link / pasted text; sorted into
+  *Ready to make*, *Missing 1* and *Missing more* from the live inventory.
+- **Add missing to list**, tagged with the recipe.
+- **Cook this:** opens Cooking mode with the recipe as a checklist; each ingredient is one
+  tap (or one scan) to deduct.
+- Needs `ANTHROPIC_API_KEY` on Vercel (see setup step 5). **Re-run `supabase/schema.sql`.**
+
 ## Code map
 
 | Path | |
 |---|---|
 | `src/lib/inventory.ts` | Quantity model: pure operations on packages |
 | `src/lib/shopping.ts` | Staple / low-stock / list rules |
+| `src/lib/recipes.ts` | Ingredient ↔ inventory matching, recipe API client |
 | `src/lib/categories.ts`, `shelfLife.ts` | Auto category / location / use-by rules |
 | `src/lib/lookup.ts` | Barcode lookup chain |
 | `src/lib/store.ts`, `sync.ts`, `db.ts` | Local-first storage, outbox, Supabase sync |
@@ -47,6 +60,7 @@ what you already have.
 | `src/screens/` | Kitchen, Scan, Settings, sign-in |
 | `supabase/schema.sql` | Database tables and access rules. **Re-run it in the Supabase SQL Editor after each new phase.** |
 | `api/upc.ts` | Vercel function proxying UPCitemdb |
+| `api/recipes.ts`, `api/import-recipe.ts` | Claude-powered recipe suggestions and import (structured output) |
 
 ```bash
 npm install && npm run dev   # local, device-only mode

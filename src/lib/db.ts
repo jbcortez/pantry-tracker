@@ -1,8 +1,8 @@
 import Dexie, { type Table } from 'dexie'
-import type { Product, ShoppingItem, Unit } from './types'
+import type { Product, Recipe, ShoppingItem, Unit } from './types'
 
-export type SyncedTable = 'products' | 'inventory_units' | 'shopping_items'
-export type SyncedRow = Product | Unit | ShoppingItem
+export type SyncedTable = 'products' | 'inventory_units' | 'shopping_items' | 'recipes'
+export type SyncedRow = Product | Unit | ShoppingItem | Recipe
 
 export interface OutboxEntry {
   /** `${table}:${row.id}` — later writes to the same row replace earlier ones. */
@@ -16,6 +16,7 @@ class PantryDB extends Dexie {
   products!: Table<Product, string>
   inventory_units!: Table<Unit, string>
   shopping_items!: Table<ShoppingItem, string>
+  recipes!: Table<Recipe, string>
   outbox!: Table<OutboxEntry, string>
   meta!: Table<{ key: string; value: unknown }, string>
 
@@ -29,6 +30,9 @@ class PantryDB extends Dexie {
     })
     this.version(2).stores({
       shopping_items: 'id, household_id, product_id',
+    })
+    this.version(3).stores({
+      recipes: 'id, household_id',
     })
   }
 }

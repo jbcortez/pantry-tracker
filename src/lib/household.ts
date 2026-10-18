@@ -59,7 +59,7 @@ export function inviteLink(h: Household): string {
 /** The household to open: `preferId` (just joined), else the one last used here, else the oldest. */
 export async function fetchMyHousehold(preferId?: string | null): Promise<Household | null> {
   if (!supabase) return null
-  const { data, error } = await supabase.from('households').select('id, name, invite_code, categories').order('created_at')
+  const { data, error } = await supabase.from('households').select('id, name, invite_code, categories, recipe_notes').order('created_at')
   if (error) throw error
   const all = (data ?? []) as Household[]
   const lastUsed = cachedHousehold()?.id
@@ -78,7 +78,7 @@ export async function joinHousehold(code: string, displayName: string | null): P
   return data as string
 }
 
-export async function updateHousehold(id: string, patch: Partial<Pick<Household, 'name' | 'categories'>>) {
+export async function updateHousehold(id: string, patch: Partial<Pick<Household, 'name' | 'categories' | 'recipe_notes'>>) {
   if (!supabase) return
   const { error } = await supabase.from('households').update(patch).eq('id', id)
   if (error) throw error

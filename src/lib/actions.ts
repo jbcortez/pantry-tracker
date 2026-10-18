@@ -2,7 +2,9 @@ import { db } from './db'
 import { addUnits, finishOne, isLive, moveUnits, openNew, setLevelLeft, summarize } from './inventory'
 import { afterChanges, checkOffFor, isLow, itemForProduct, newShoppingItem, openItemFor, stapleListing } from './shopping'
 import { commit, newId, type Undo } from './store'
-import type { Location, Product, ProductDraft, ShoppingItem, ShoppingSource, Unit } from './types'
+import { categorize } from './categories'
+import type { MatchedIngredient } from './recipes'
+import type { Location, Product, ProductDraft, Recipe, RecipeDraft, ShoppingItem, ShoppingSource, Unit } from './types'
 
 /** Inventory operations as the screens use them: read current state, compute, commit with undo. */
 
@@ -148,6 +150,65 @@ export async function listLowStaples(householdId: string): Promise<{ undo: Undo;
   for (const p of staples) {
     const units = await liveUnitsOf(p.id)
     if (isLow(units) && !openItemFor(p.id, await listItemsFor(p.id))) additions.push(itemForProduct(p, 'staple', newId))
+  }
+  return { undo: await commit({ shopping: additions }), count: additions.length }
+}
+
+// ───────────── Recipes ─────────────
+
+export async function saveRecipe(
+  householdId: string,
+  draft: RecipeDraft,
+  source: Recipe['source'],
+  sourceUrl: string | null = null,
+): Promise<{ recipe: Recipe; undo: Undo }> {
+  const at = new Date().toISOString()
+  const recipe: Recipe = {
+    ...draft,
+    id: newId(),
+    household_id: householdId,
+    source,
+    source_url: sourceUrl,
+    created_at: at,
+    updated_at: at,
+    deleted_at: null,
+  }
+  return { recipe, undo: await commit({ recipes: [recipe] }) }
+}
+
+export async function deleteRecipe(recipe: Recipe): Promise<Undo> {
+  const at = new Date().toISOString()
+  return commit({ recipes: [{ ...recipe, deleted_at: at, updated_at: at }] })
+}
+
+/** Put a recipe's missing ingredients on the list, skipping anything already there. */
+export async function addMissingToList(
+  householdId: string,
+  title: string,
+  missing: MatchedIngredient[],
+): Promise<{ undo: Undo; count: number }> {
+  const open = (await db.shopping_items.where('household_id').equals(householdId).toArray()).filter(
+    (i) => !i.deleted_at && !i.checked_at,
+  )
+  const additions: ShoppingItem[] = []
+  for (const { ingredient, product } of missing) {
+    const already = open.some(
+      (i) => (product && i.product_id === product.id) || i.name.toLowerCase() === ingredient.name.toLowerCase(),
+    )
+    if (already) continue
+    additions.push(
+      newShoppingItem(
+        householdId,
+        {
+          name: product?.name ?? ingredient.name,
+          category: product?.category ?? categorize([], ingredient.name),
+          product_id: product?.id ?? null,
+          note: `For ${title}`,
+        },
+        'recipe',
+        newId,
+      ),
+    )
   }
   return { undo: await commit({ shopping: additions }), count: additions.length }
 }
