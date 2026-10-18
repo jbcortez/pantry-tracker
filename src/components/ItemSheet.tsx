@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { moveGroup, putAway, removeUnits, updateProduct, updateUnit } from '../lib/actions'
+import { addProductToList, moveGroup, putAway, removeUnits, setStaple, updateProduct, updateUnit } from '../lib/actions'
 import { useApp } from '../lib/appContext'
 import { levelLabel, LEVELS } from '../lib/inventory'
 import { useByAfterOpening } from '../lib/shelfLife'
@@ -27,6 +27,8 @@ function ItemDetails({ group, onClose }: { group: Group; onClose: () => void }) 
   )
 
   const run = async (label: string, op: Promise<Undo>) => toast({ message: label, undo: await op })
+  const report = (label: string, r: { undo: Undo; listed?: boolean }) =>
+    toast({ message: r.listed ? `${label} · added to shopping list` : label, undo: r.undo })
 
   return (
     <div className="space-y-5">
@@ -36,6 +38,27 @@ function ItemDetails({ group, onClose }: { group: Group; onClose: () => void }) 
           {[product.brand, product.package_size].filter(Boolean).join(' · ') || 'No brand'}
           {product.barcode && <div className="text-xs text-stone-400">Barcode {product.barcode}</div>}
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button
+          aria-pressed={!!product.staple}
+          variant={product.staple ? 'accent' : 'secondary'}
+          onClick={async () => {
+            const r = await setStaple(product, !product.staple)
+            report(product.staple ? 'No longer a staple' : 'Staple: keeps itself on the list when low', r)
+          }}
+        >
+          {product.staple ? '★ Staple' : '☆ Keep stocked'}
+        </Button>
+        <Button
+          onClick={async () => {
+            const undo = await addProductToList(product)
+            toast(undo ? { message: 'Added to shopping list', undo } : { message: 'Already on the list' })
+          }}
+        >
+          ＋ Shopping list
+        </Button>
       </div>
 
       <Field label="Location" group>
@@ -66,7 +89,7 @@ function ItemDetails({ group, onClose }: { group: Group; onClose: () => void }) 
         </div>
         <ul className="divide-y divide-stone-100 rounded-xl border border-stone-200">
           {sorted.map((u) => (
-            <UnitRow key={u.id} unit={u} product={product} onDone={(label, undo) => toast({ message: label, undo })} />
+            <UnitRow key={u.id} unit={u} product={product} onDone={report} />
           ))}
         </ul>
       </div>
@@ -78,9 +101,9 @@ function ItemDetails({ group, onClose }: { group: Group; onClose: () => void }) 
           <Button onClick={() => setEditing(true)}>Edit details</Button>
           <Button
             variant="danger"
-            onClick={() => {
-              void run(`Removed ${product.name}`, removeUnits(units))
+            onClick={async () => {
               onClose()
+              report(`Removed ${product.name}`, await removeUnits(product, units))
             }}
           >
             Remove all
@@ -91,14 +114,22 @@ function ItemDetails({ group, onClose }: { group: Group; onClose: () => void }) 
   )
 }
 
-function UnitRow({ unit, product, onDone }: { unit: Unit; product: Product; onDone: (label: string, undo: Undo) => void }) {
+function UnitRow({
+  unit,
+  product,
+  onDone,
+}: {
+  unit: Unit
+  product: Product
+  onDone: (label: string, r: { undo: Undo; listed?: boolean }) => void
+}) {
   const setLevel = async (level: number) => {
     const use_by = unit.opened_at
       ? unit.use_by
       : useByAfterOpening(unit.use_by, product.category, unit.location, product.name)
     onDone(
       `${levelLabel(level)} left`,
-      await updateUnit(unit, { level, opened_at: unit.opened_at ?? new Date().toISOString(), use_by }),
+      await updateUnit(product, unit, { level, opened_at: unit.opened_at ?? new Date().toISOString(), use_by }),
     )
   }
   return (
@@ -113,7 +144,7 @@ function UnitRow({ unit, product, onDone }: { unit: Unit; product: Product; onDo
             type="button"
             aria-label="Remove this package"
             className="rounded-full px-2 py-1 text-stone-400 active:bg-stone-100"
-            onClick={async () => onDone('Removed 1', await removeUnits([unit]))}
+            onClick={async () => onDone('Removed 1', await removeUnits(product, [unit]))}
           >
             🗑
           </button>
@@ -141,7 +172,7 @@ function UnitRow({ unit, product, onDone }: { unit: Unit; product: Product; onDo
           aria-label="Use by"
           className="ml-auto rounded-lg border border-stone-200 px-2 py-1 text-xs"
           value={unit.use_by ?? ''}
-          onChange={async (e) => onDone('Date updated', await updateUnit(unit, { use_by: e.target.value || null }))}
+          onChange={async (e) => onDone('Date updated', await updateUnit(product, unit, { use_by: e.target.value || null }))}
         />
       </div>
     </li>

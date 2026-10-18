@@ -5,7 +5,7 @@ import { QuickAddSheet } from '../components/QuickAddSheet'
 import { Scanner } from '../components/Scanner'
 import { useToast } from '../components/Toast'
 import { Button, inputClass, Segmented, Sheet } from '../components/ui'
-import { consume, createProduct, liveUnitsOf, putAway, type Result, type UseChoice } from '../lib/actions'
+import { addProductToList, consume, createProduct, liveUnitsOf, putAway, type Result, type UseChoice } from '../lib/actions'
 import { useApp } from '../lib/appContext'
 import { describeQuantity, levelLabel, LEVELS, summarize } from '../lib/inventory'
 import { findKnownProduct, lookupBarcode, normalizeBarcode } from '../lib/lookup'
@@ -66,9 +66,22 @@ export function Scan() {
   }
 
   const announceUse = (product: Product, r: Result, verb: string) => {
-    const tail = r.remaining ? `${r.remaining} left` : 'all gone'
+    const tail = r.listed ? 'added to shopping list' : r.remaining ? `${r.remaining} left` : 'all gone'
     const text = `${verb} ${product.name} · ${tail}`
-    toast({ message: text, undo: r.undo, tone: r.remaining ? 'ok' : 'warn' })
+    toast({
+      message: text,
+      undo: r.undo,
+      tone: r.remaining && !r.listed ? 'ok' : 'warn',
+      action: r.ranOut
+        ? {
+            label: '＋ List',
+            run: async () => {
+              await addProductToList(product, 'ran_out')
+              toast({ message: `${product.name} added to shopping list` })
+            },
+          }
+        : undefined,
+    })
     record(`－ ${text}`)
   }
 

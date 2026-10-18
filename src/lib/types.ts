@@ -21,6 +21,8 @@ export interface Product {
   default_location: Location
   tracking: Tracking
   source: ProductSource
+  /** "Always keep stocked": goes on the shopping list automatically when low. */
+  staple?: boolean
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -38,6 +40,23 @@ export interface Unit {
   /** YYYY-MM-DD */
   use_by: string | null
   added_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type ShoppingSource = 'manual' | 'staple' | 'ran_out' | 'recipe'
+
+export interface ShoppingItem {
+  id: string
+  household_id: string
+  /** Linked when the item is something the household has had before. */
+  product_id: string | null
+  name: string
+  category: string
+  note: string | null
+  source: ShoppingSource
+  checked_at: string | null
+  created_at: string
   updated_at: string
   deleted_at: string | null
 }

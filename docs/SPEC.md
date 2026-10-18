@@ -137,6 +137,8 @@ scanning again adds another.
 - **Ran out**: when a non-staple hits zero, a toast offers *"Add to shopping list?"*.
 - **Checking off an item does NOT add it to inventory** — the put-away scan at home does,
   avoiding double counting.
+- Scanning an item in **Putting Away** ticks its list entry off automatically.
+- Each list entry shows how much you still have ("Have: ½ open"), handy in the store.
 
 ## 9. Recipes (Phase 3)
 

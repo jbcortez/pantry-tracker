@@ -1,7 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { db, getMeta, setMeta, type OutboxEntry, type SyncedTable } from './db'
+import { db, getMeta, setMeta, type OutboxEntry, type SyncedRow, type SyncedTable } from './db'
 import { supabase } from './supabase'
-import type { Product, Unit } from './types'
 
 /**
  * Offline-tolerant sync.
@@ -12,7 +11,7 @@ import type { Product, Unit } from './types'
  * concurrent adds from two phones never collide.
  */
 
-const TABLES: SyncedTable[] = ['products', 'inventory_units'] // FK order
+const TABLES: SyncedTable[] = ['products', 'inventory_units', 'shopping_items'] // FK order
 /** Re-read a little before the cursor so rows committed out of order aren't missed. */
 const CURSOR_OVERLAP_MS = 10_000
 const PAGE = 500
@@ -60,7 +59,7 @@ async function removeIfUnchanged(pushed: OutboxEntry[]) {
   })
 }
 
-async function applyRemote(table: SyncedTable, rows: (Product | Unit)[]) {
+async function applyRemote(table: SyncedTable, rows: SyncedRow[]) {
   if (!rows.length) return
   await db.transaction('rw', db.table(table), db.outbox, async () => {
     const pending = await db.outbox.bulkGet(rows.map((r) => `${table}:${r.id}`))
@@ -90,9 +89,9 @@ export async function pull(): Promise<void> {
         console.warn('Sync pull failed', error)
         return
       }
-      await applyRemote(table, data as (Product | Unit)[])
+      await applyRemote(table, data as SyncedRow[])
       if (!data.length) break
-      const last = data[data.length - 1] as Product | Unit
+      const last = data[data.length - 1] as SyncedRow
       newest = last.updated_at
       after = { ts: last.updated_at, id: last.id }
       if (data.length < PAGE) break
@@ -113,7 +112,7 @@ export function startSync(hid: string, onHouseholdChange: () => void): () => voi
       'postgres_changes',
       { event: '*', schema: 'public', table, filter: `household_id=eq.${hid}` },
       (payload) => {
-        if (payload.new && 'id' in payload.new) void applyRemote(table, [payload.new as Product | Unit])
+        if (payload.new && 'id' in payload.new) void applyRemote(table, [payload.new as SyncedRow])
       },
     )
   }

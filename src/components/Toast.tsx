@@ -5,6 +5,8 @@ interface ToastData {
   id: number
   message: ReactNode
   undo?: Undo
+  /** A follow-up offer, e.g. "Add to list". */
+  action?: { label: string; run: () => unknown }
   tone?: 'ok' | 'warn'
 }
 
@@ -21,7 +23,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     clearTimeout(timer.current)
     const id = ++seq.current
     setToast({ ...t, id })
-    timer.current = setTimeout(() => setToast((cur) => (cur?.id === id ? null : cur)), t.undo ? 6000 : 3000)
+    timer.current = setTimeout(
+      () => setToast((cur) => (cur?.id === id ? null : cur)),
+      t.action ? 8000 : t.undo ? 6000 : 3000,
+    )
   }, [])
 
   const undo = async () => {
@@ -45,6 +50,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             }`}
           >
             <span className="flex-1">{toast.message}</span>
+            {toast.action && (
+              <button
+                type="button"
+                onClick={() => {
+                  setToast(null)
+                  void toast.action!.run()
+                }}
+                className="rounded-lg bg-white/15 px-2 py-1 font-semibold whitespace-nowrap"
+              >
+                {toast.action.label}
+              </button>
+            )}
             {toast.undo && (
               <button type="button" onClick={undo} className="font-semibold text-brand-100 uppercase">
                 Undo
