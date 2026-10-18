@@ -17,7 +17,7 @@ export function Settings() {
     if (cloud) fetchMembers(household.id).then(setMembers).catch(() => {})
   }, [cloud, household.id])
 
-  const save = async (patch: Partial<Pick<Household, 'name' | 'categories'>>) => {
+  const save = async (patch: Partial<Pick<Household, 'name' | 'categories' | 'recipe_notes'>>) => {
     const next = { ...household, ...patch }
     setHousehold(next)
     try {
@@ -80,6 +80,14 @@ export function Settings() {
 
       <CategoriesCard categories={categories} onSave={(c) => void save({ categories: c })} />
 
+      <RecipeNotesCard
+        notes={household.recipe_notes ?? ''}
+        onSave={(recipe_notes) => {
+          void save({ recipe_notes })
+          toast({ message: 'Saved — recipes will follow this' })
+        }}
+      />
+
       <Card title="Install on your phone">
         <ul className="list-disc space-y-1 pl-5 text-sm text-stone-700">
           <li>
@@ -109,6 +117,28 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="mb-3 font-semibold">{title}</h2>
       {children}
     </section>
+  )
+}
+
+function RecipeNotesCard({ notes, onSave }: { notes: string; onSave: (n: string) => void }) {
+  const [value, setValue] = useState(notes)
+  useEffect(() => setValue(notes), [notes])
+  return (
+    <Card title="Recipe preferences">
+      <textarea
+        className={`${inputClass} min-h-20`}
+        placeholder="e.g. No pork. Kids don’t like spicy food. Prefer one-pot meals."
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        aria-label="Recipe preferences"
+      />
+      <p className="mt-1 text-xs text-stone-500">Dietary rules and dislikes for everyone in the household.</p>
+      {value.trim() !== notes.trim() && (
+        <Button variant="primary" className="mt-3 w-full" onClick={() => onSave(value.trim())}>
+          Save preferences
+        </Button>
+      )}
+    </Card>
   )
 }
 

@@ -61,6 +61,35 @@ export interface ShoppingItem {
   deleted_at: string | null
 }
 
+export interface RecipeIngredient {
+  name: string
+  amount: string
+  /** The inventory product this uses, when known. Matching also falls back to the name. */
+  product_id: string | null
+  /** Salt, pepper, water: assumed on hand. */
+  staple: boolean
+}
+
+/** A recipe as written, before it's saved to the household's recipe box. */
+export interface RecipeDraft {
+  title: string
+  summary: string
+  time_minutes: number | null
+  servings: number | null
+  ingredients: RecipeIngredient[]
+  steps: string[]
+}
+
+export interface Recipe extends RecipeDraft {
+  id: string
+  household_id: string
+  source: 'ai' | 'url' | 'manual'
+  source_url: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
 export interface CategoryDef {
   id: string
   label: string
@@ -73,6 +102,8 @@ export interface Household {
   invite_code: string
   /** Household overrides of the default category list; empty means defaults. */
   categories: CategoryDef[]
+  /** Dietary rules and dislikes, followed by recipe suggestions. */
+  recipe_notes?: string
 }
 
 /** Fields of a product before it is saved. */

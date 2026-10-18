@@ -75,6 +75,26 @@ create table if not exists public.shopping_items (
 );
 create index if not exists shopping_household_updated on public.shopping_items (household_id, updated_at, id);
 
+-- Phase 3: recipes.
+alter table public.households add column if not exists recipe_notes text not null default '';
+
+create table if not exists public.recipes (
+  id uuid primary key,
+  household_id uuid not null references public.households on delete cascade,
+  title text not null,
+  summary text not null default '',
+  time_minutes integer,
+  servings integer,
+  ingredients jsonb not null default '[]'::jsonb,
+  steps jsonb not null default '[]'::jsonb,
+  source text not null check (source in ('ai', 'url', 'manual')),
+  source_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists recipes_household_updated on public.recipes (household_id, updated_at, id);
+
 -- The server clock decides updated_at, so sync cursors don't depend on phone clocks.
 create or replace function public.touch_updated_at() returns trigger
 language plpgsql as $$
@@ -95,6 +115,9 @@ create trigger touch before insert or update on public.inventory_units
 drop trigger if exists touch on public.shopping_items;
 create trigger touch before insert or update on public.shopping_items
   for each row execute function public.touch_updated_at();
+drop trigger if exists touch on public.recipes;
+create trigger touch before insert or update on public.recipes
+  for each row execute function public.touch_updated_at();
 
 -- ───────────────────────── Access rules ─────────────────────────
 -- Members of a household can see and change everything in it, and nothing else.
@@ -111,6 +134,7 @@ alter table public.household_members enable row level security;
 alter table public.products enable row level security;
 alter table public.inventory_units enable row level security;
 alter table public.shopping_items enable row level security;
+alter table public.recipes enable row level security;
 
 drop policy if exists "members read" on public.households;
 create policy "members read" on public.households for select using (public.is_member(id));
@@ -136,7 +160,11 @@ drop policy if exists "members all" on public.shopping_items;
 create policy "members all" on public.shopping_items for all
   using (public.is_member(household_id)) with check (public.is_member(household_id));
 
-grant select, insert, update, delete on public.products, public.inventory_units, public.shopping_items to authenticated;
+drop policy if exists "members all" on public.recipes;
+create policy "members all" on public.recipes for all
+  using (public.is_member(household_id)) with check (public.is_member(household_id));
+
+grant select, insert, update, delete on public.products, public.inventory_units, public.shopping_items, public.recipes to authenticated;
 
 -- ───────────────────────── Create / join ─────────────────────────
 
@@ -184,7 +212,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['households', 'products', 'inventory_units', 'shopping_items'] loop
+  foreach t in array array['households', 'products', 'inventory_units', 'shopping_items', 'recipes'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

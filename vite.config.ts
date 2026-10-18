@@ -1,11 +1,49 @@
 /// <reference types="vitest/config" />
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+/** Serves api/*.ts in `npm run dev` with the same handlers Vercel runs in production. */
+function devApi(): Plugin {
+  return {
+    name: 'dev-api',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const match = req.url?.match(/^\/api\/([a-z-]+)(\?.*)?$/)
+        if (!match) return next()
+        // Let local API handlers see .env.local (e.g. ANTHROPIC_API_KEY), as Vercel would.
+        Object.assign(process.env, { ...loadEnv(server.config.mode, process.cwd(), ''), ...process.env })
+        try {
+          const mod = await server.ssrLoadModule(`/api/${match[1]}.ts`)
+          const handler = mod[req.method ?? 'GET']
+          if (typeof handler !== 'function') {
+            res.statusCode = 405
+            return res.end()
+          }
+          const chunks: Buffer[] = []
+          for await (const chunk of req) chunks.push(chunk as Buffer)
+          const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks)
+          const request = new Request(`http://${req.headers.host}${req.url}`, {
+            method: req.method,
+            headers: req.headers as Record<string, string>,
+            body,
+          })
+          const response: Response = await handler(request)
+          res.statusCode = response.status
+          response.headers.forEach((v, k) => res.setHeader(k, v))
+          res.end(Buffer.from(await response.arrayBuffer()))
+        } catch (err) {
+          next(err)
+        }
+      })
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
+    devApi(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -36,14 +74,6 @@ export default defineConfig({
   ],
   server: {
     host: true,
-    proxy: {
-      // Same response shape as api/upc.ts on Vercel.
-      '/api/upc': {
-        target: 'https://api.upcitemdb.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/upc/, '/prod/trial/lookup'),
-      },
-    },
   },
   test: {
     environment: 'node',

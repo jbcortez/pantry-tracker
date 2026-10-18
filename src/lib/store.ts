@@ -1,12 +1,13 @@
 import { db, type SyncedRow, type SyncedTable } from './db'
 import { supabase } from './supabase'
 import { scheduleFlush } from './sync'
-import type { Product, ShoppingItem, Unit } from './types'
+import type { Product, Recipe, ShoppingItem, Unit } from './types'
 
 export interface Changes {
   products?: Product[]
   units?: Unit[]
   shopping?: ShoppingItem[]
+  recipes?: Recipe[]
 }
 
 export type Undo = () => Promise<void>
@@ -17,6 +18,7 @@ const TABLE_OF: Record<keyof Changes, SyncedTable> = {
   products: 'products',
   units: 'inventory_units',
   shopping: 'shopping_items',
+  recipes: 'recipes',
 }
 
 async function write(table: SyncedTable, rows: SyncedRow[]) {
@@ -36,7 +38,7 @@ export async function commit(changes: Changes): Promise<Undo> {
   const keys = (Object.keys(TABLE_OF) as (keyof Changes)[]).filter((k) => changes[k]?.length)
   const before = new Map<keyof Changes, (SyncedRow | undefined)[]>()
 
-  await db.transaction('rw', [db.products, db.inventory_units, db.shopping_items, db.outbox], async () => {
+  await db.transaction('rw', [db.products, db.inventory_units, db.shopping_items, db.recipes, db.outbox], async () => {
     for (const k of keys) {
       const rows = changes[k] as SyncedRow[]
       before.set(k, await db.table(TABLE_OF[k]).bulkGet(rows.map((r) => r.id)))

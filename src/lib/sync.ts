@@ -11,7 +11,7 @@ import { supabase } from './supabase'
  * concurrent adds from two phones never collide.
  */
 
-const TABLES: SyncedTable[] = ['products', 'inventory_units', 'shopping_items'] // FK order
+const TABLES: SyncedTable[] = ['products', 'inventory_units', 'shopping_items', 'recipes'] // FK order
 /** Re-read a little before the cursor so rows committed out of order aren't missed. */
 const CURSOR_OVERLAP_MS = 10_000
 const PAGE = 500
