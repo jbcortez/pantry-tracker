@@ -142,19 +142,22 @@ scanning again adds another.
 
 ## 9. Recipes (Phase 3)
 
-- **"What can I make?"** — AI-generated recipes (Claude) from the current inventory,
-  weighted toward soon-to-expire items. Optional filters: time, servings, cuisine.
-  Assumes common staples (salt, pepper, water). Suggests 3–5 dishes.
-- **Household recipe box** — save generated recipes you liked, or import from a URL.
-  Each saved recipe is matched against inventory: *Ready to make* / *Missing 1*.
-- **"Cook this"** — opens Cooking mode preloaded with that recipe's ingredients as a
+Recipe ideas come from the household's own Claude, not an AI service built into the app.
+
+- **Pantry connector (MCP)** at `/api/mcp`, for the Claude app (phone, desktop, web) and
+  Claude Code; **`pantry` CLI** for Claude Code and scripts. Same four abilities:
+  - `get_inventory`: kitchen by location and aisle, a USE SOON section and household preferences
+  - `get_shopping_list`
+  - `save_recipe`: into the household recipe box; replies with what's on hand and what's missing
+  - `add_to_shopping_list`: skips duplicates
+- **Keys:** created per household in Settings → Claude, shown once and stored only as a hash,
+  revocable. A key can do those four things and nothing else (enforced by database functions).
+- **Household recipe box:** recipes are matched against the live inventory and grouped
+  *Ready to make* / *Missing 1* / *Missing more*.
+- **"Cook this"** opens Cooking mode preloaded with that recipe's ingredients as a
   checklist to deduct.
-- Household preference notes (dietary rules, dislikes) live in Settings; none today.
-- The AI key lives server-side only, and the endpoints require a signed-in household member.
-- Model: Claude Opus 5.5 with structured output, so recipes always parse; server-side
-  fallback is enabled so a declined request is retried on another model automatically.
-- Import reads schema.org Recipe data when the page has it (most recipe sites do), else the
-  page text; pasted text works for sites that block it.
+- **"Add missing to list"** in the app, tagged with the recipe.
+- Household preference notes (dietary rules, dislikes) live in Settings and are sent with the inventory.
 
 ## 10. Tech stack
 
@@ -164,9 +167,9 @@ scanning again adds another.
 | Local storage | IndexedDB via Dexie (offline cache + outbound change queue) |
 | Barcode decoding | Native `BarcodeDetector` where available (Android Chrome); ZXing-WASM fallback (iPhone), bundled locally so it works offline |
 | Backend | Supabase — Postgres, auth, realtime, row-level security per household |
-| Server functions | Vercel Functions (`/api/*`) — UPCitemdb proxy now, Claude calls in Phase 3 |
+| Server functions | Vercel Functions (`/api/*`): UPCitemdb proxy, Claude connector (MCP) and CLI endpoint |
 | Hosting | Vercel (free); auto-deploys on push. HTTPS is required for camera access. |
-| Cost | Free tiers + small per-use AI cost in Phase 3 |
+| Cost | Free tiers; recipes use the household's existing Claude plan |
 
 ### Sync design
 - Every row has a client-generated UUID, a server-set `updated_at`, and a soft-delete
@@ -185,4 +188,4 @@ scanning again adds another.
 |---|---|
 | **1 — Inventory & scanning** | Household + invite link, sign-in, Putting Away & Cooking scan modes, lookup chain + barcode memory, produce quick-add, auto categories, count/level quantities, expiry estimates, Use-soon list, inventory views, item editing, undo, offline cache + queue, installable PWA. |
 | **2 — Shopping list** | Shared aisle-grouped list, staples auto-add, ran-out prompts. |
-| **3 — Recipes** | AI "What can I make?", recipe box + URL import, inventory matching, Cook this. |
+| **3 — Recipes** | Claude connector + CLI, recipe box, inventory matching, Cook this. |

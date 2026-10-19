@@ -1,8 +1,6 @@
-import { daysUntil } from './dates'
-import { describeQuantity, isLive, summarize } from './inventory'
-import { isLow } from './shopping'
-import { supabase } from './supabase'
-import type { CategoryDef, Product, RecipeDraft, RecipeIngredient, Unit } from './types'
+import { isLive } from './inventory.js'
+import { isLow } from './shopping.js'
+import type { Product, RecipeDraft, RecipeIngredient, Unit } from './types.js'
 
 // ───────────── Matching ingredients to the kitchen ─────────────
 
@@ -96,65 +94,4 @@ export function ingredientLine(ing: RecipeIngredient): { lead: string; rest: str
   const amount = ing.amount.trim()
   if (!amount) return { lead: '', rest: ing.name }
   return /^[\d½¼¾⅓⅔⅛]/.test(amount) ? { lead: amount, rest: ing.name } : { lead: '', rest: `${ing.name}, ${amount}` }
-}
-
-// ───────────── Talking to the recipe endpoints ─────────────
-
-export interface InventoryItem {
-  id: string
-  name: string
-  category: string
-  quantity: string
-  days_left: number | null
-}
-
-export function inventoryForAI(kitchen: KitchenLike, categories: CategoryDef[]): InventoryItem[] {
-  const label = new Map(categories.map((c) => [c.id, c.label]))
-  return kitchen.products
-    .map((p) => ({ p, us: (kitchen.unitsByProduct.get(p.id) ?? []).filter(isLive) }))
-    .filter(({ us }) => us.length)
-    .map(({ p, us }) => {
-      const next = summarize(us).nextUseBy
-      return {
-        id: p.id,
-        name: p.brand ? `${p.name} (${p.brand})` : p.name,
-        category: label.get(p.category) ?? p.category,
-        quantity: describeQuantity(p, us),
-        days_left: next ? daysUntil(next) : null,
-      }
-    })
-}
-
-export async function callApi<T>(path: string, body: unknown): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  const token = (await supabase?.auth.getSession())?.data.session?.access_token
-  if (token) headers.Authorization = `Bearer ${token}`
-  let res: Response
-  try {
-    res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) })
-  } catch {
-    throw new Error('You’re offline. Recipes need a connection.')
-  }
-  const data = (await res.json().catch(() => ({}))) as { error?: string }
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`)
-  return data as T
-}
-
-export interface GenerateOptions {
-  count?: number
-  maxMinutes?: number | null
-  servings?: number | null
-  cuisine?: string
-  useExpiring?: boolean
-  notes?: string
-}
-
-export async function generateRecipes(inventory: InventoryItem[], opts: GenerateOptions): Promise<RecipeDraft[]> {
-  const { recipes } = await callApi<{ recipes: RecipeDraft[] }>('/api/recipes', { inventory, ...opts })
-  return recipes
-}
-
-export async function importRecipe(inventory: InventoryItem[], source: { url?: string; text?: string }): Promise<RecipeDraft> {
-  const { recipe } = await callApi<{ recipe: RecipeDraft }>('/api/import-recipe', { inventory, ...source })
-  return recipe
 }

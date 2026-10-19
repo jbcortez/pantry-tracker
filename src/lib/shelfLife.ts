@@ -1,5 +1,5 @@
-import { addDays, minDate } from './dates'
-import type { Location } from './types'
+import { addDays, minDate } from './dates.js'
+import type { Location } from './types.js'
 
 type Days = Record<Location, number>
 

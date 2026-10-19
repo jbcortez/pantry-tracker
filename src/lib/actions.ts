@@ -4,7 +4,7 @@ import { afterChanges, checkOffFor, isLow, itemForProduct, newShoppingItem, open
 import { commit, newId, type Undo } from './store'
 import { categorize } from './categories'
 import type { MatchedIngredient } from './recipes'
-import type { Location, Product, ProductDraft, Recipe, RecipeDraft, ShoppingItem, ShoppingSource, Unit } from './types'
+import type { Location, Product, ProductDraft, Recipe, ShoppingItem, ShoppingSource, Unit } from './types'
 
 /** Inventory operations as the screens use them: read current state, compute, commit with undo. */
 
@@ -155,26 +155,6 @@ export async function listLowStaples(householdId: string): Promise<{ undo: Undo;
 }
 
 // ───────────── Recipes ─────────────
-
-export async function saveRecipe(
-  householdId: string,
-  draft: RecipeDraft,
-  source: Recipe['source'],
-  sourceUrl: string | null = null,
-): Promise<{ recipe: Recipe; undo: Undo }> {
-  const at = new Date().toISOString()
-  const recipe: Recipe = {
-    ...draft,
-    id: newId(),
-    household_id: householdId,
-    source,
-    source_url: sourceUrl,
-    created_at: at,
-    updated_at: at,
-    deleted_at: null,
-  }
-  return { recipe, undo: await commit({ recipes: [recipe] }) }
-}
 
 export async function deleteRecipe(recipe: Recipe): Promise<Undo> {
   const at = new Date().toISOString()

@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { addMissingToList, deleteRecipe, saveRecipe } from '../lib/actions'
+import { addMissingToList, deleteRecipe } from '../lib/actions'
 import { useApp } from '../lib/appContext'
 import { useCooking } from '../lib/cooking'
 import { ingredientLine, matchRecipe, missing, type IngredientState } from '../lib/recipes'
@@ -21,44 +20,23 @@ export function recipeMeta(r: RecipeDraft): string {
     .join(' · ')
 }
 
-/** Full recipe view. `saved` is set for recipes in the recipe box; drafts get a Save button. */
-export function RecipeSheet({
-  recipe,
-  saved,
-  source,
-  onClose,
-}: {
-  recipe: RecipeDraft | null
-  saved?: Recipe
-  source?: { kind: Recipe['source']; url?: string | null }
-  onClose: () => void
-}) {
+/** Full view of a recipe from the recipe box. */
+export function RecipeSheet({ recipe, onClose }: { recipe: Recipe | null; onClose: () => void }) {
   return (
     <Sheet open={!!recipe} onClose={onClose} title={recipe?.title}>
-      {recipe && <RecipeDetails recipe={recipe} saved={saved} source={source} onClose={onClose} />}
+      {recipe && <RecipeDetails recipe={recipe} onClose={onClose} />}
     </Sheet>
   )
 }
 
-function RecipeDetails({
-  recipe,
-  saved,
-  source,
-  onClose,
-}: {
-  recipe: RecipeDraft
-  saved?: Recipe
-  source?: { kind: Recipe['source']; url?: string | null }
-  onClose: () => void
-}) {
+function RecipeDetails({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
   const { household } = useApp()
   const kitchen = useKitchen(household.id)
   const toast = useToast()
   const cooking = useCooking()
-  const [savedNow, setSavedNow] = useState(false)
   const matched = matchRecipe(recipe, kitchen)
   const need = missing(matched)
-  const url = saved?.source_url ?? source?.url
+  const url = recipe.source_url
 
   return (
     <div className="space-y-5">
@@ -87,28 +65,15 @@ function RecipeDetails({
         >
           🍳 Cook this
         </Button>
-        {saved ? (
-          <Button
-            variant="danger"
-            onClick={async () => {
-              onClose()
-              toast({ message: 'Removed from recipe box', undo: await deleteRecipe(saved) })
-            }}
-          >
-            Remove
-          </Button>
-        ) : (
-          <Button
-            disabled={savedNow}
-            onClick={async () => {
-              const { undo } = await saveRecipe(household.id, recipe, source?.kind ?? 'ai', source?.url ?? null)
-              setSavedNow(true)
-              toast({ message: 'Saved to recipe box', undo })
-            }}
-          >
-            {savedNow ? '✓ Saved' : '♡ Save'}
-          </Button>
-        )}
+        <Button
+          variant="danger"
+          onClick={async () => {
+            onClose()
+            toast({ message: 'Removed from recipe box', undo: await deleteRecipe(recipe) })
+          }}
+        >
+          Remove
+        </Button>
       </div>
 
       <section>

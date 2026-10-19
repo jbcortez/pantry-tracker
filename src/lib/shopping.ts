@@ -1,5 +1,5 @@
-import { isLive, summarize } from './inventory'
-import type { Product, ShoppingItem, ShoppingSource, Unit } from './types'
+import { isLive, summarize } from './inventory.js'
+import type { Product, ShoppingItem, ShoppingSource, Unit } from './types.js'
 
 /** Pure shopping-list rules. */
 

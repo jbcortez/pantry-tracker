@@ -1,8 +1,7 @@
 # Setup: getting Pantry onto your phones
 
 About 15 minutes, once. You need two free accounts: **Supabase** (the shared database)
-and **Vercel** (the website host), plus an **Anthropic API key** for recipe suggestions
-(step 5; pay-as-you-go). After this, every update to the code goes live on its own.
+and **Vercel** (the website host). After this, every update to the code goes live on its own.
 
 > Without any setup, the app still runs in **device-only mode**: everything works, but
 > data lives only on that one device and isn't shared or backed up.
@@ -75,18 +74,29 @@ Save. This lets the "tap here to sign in" link in the email return to your app.
 
 The first time you open Scan, allow camera access.
 
-## 5. Recipes: Anthropic API key
+## 5. Connect Claude (for recipes)
 
-Recipe suggestions and recipe import use Claude. Everything else works without this.
+Claude plans meals from what's in your kitchen and saves recipes into the app's recipe box.
+It uses your regular Claude account, so there's no API key or extra bill.
 
-1. Go to **https://console.anthropic.com** → sign up → **Billing** → add a small amount of
-   credit. Each "Suggest recipes" costs roughly 5–20¢; importing a recipe costs less.
-2. **API Keys → Create Key**, name it `pantry`, and copy it.
-3. In Vercel → your project → **Settings → Environment Variables**, add
-   `ANTHROPIC_API_KEY` with that value. (No `VITE_` prefix: it must stay on the server.)
-4. **Deployments** → ⋯ on the latest → **Redeploy**.
+1. In the app: **Settings → Claude → Create key**. Copy what you need from the box that
+   appears (it's shown once; you can always make another key or revoke one).
+2. **Claude app (phone, desktop, web):** in Claude, open **Settings → Connectors → Add custom
+   connector**, name it **Pantry**, and paste the connector URL. In a chat, make sure the Pantry
+   connector is enabled, then ask things like *"What can I make tonight with what's expiring?"*
+3. **Claude Code:** run the `claude mcp add …` line from the same box, or use the CLI:
 
-Only signed-in members of your household can use it, so the key can't be spent by strangers.
+   ```bash
+   # In a clone of this repo (the CLI is one file with no dependencies; needs Node 18+):
+   npm link                      # puts `pantry` on your PATH
+   pantry setup <app-url> <key>
+   pantry inventory
+   ```
+
+   In a clone of this repo, Claude Code also picks up the `pantry` skill automatically.
+
+Claude can only read the kitchen, read the list, save recipes and add to the shopping list. It
+can't remove or change anything else. Each person can have their own key.
 
 ## Updating
 
@@ -111,7 +121,7 @@ Editor**, paste the latest [`supabase/schema.sql`](../supabase/schema.sql) again
 
 ```bash
 npm install
-cp .env.example .env.local   # optional: Supabase values, ANTHROPIC_API_KEY for recipes
+cp .env.example .env.local   # optional: the two Supabase values
 npm run dev                  # http://localhost:5173 (also serves /api/*)
 npm test                     # unit tests
 ```

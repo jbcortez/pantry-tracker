@@ -36,15 +36,15 @@ what you already have.
 
 ## What's in Phase 3
 
-- **"What can I make?"**: Claude suggests 3–5 recipes from what's in the kitchen, with the
-  expiring items first. Options for time, servings and cuisine, and household preferences
-  from Settings are always followed.
-- **Recipe box:** save suggestions or import from a link / pasted text; sorted into
-  *Ready to make*, *Missing 1* and *Missing more* from the live inventory.
+- **Recipes with Claude:** the Pantry connector (for the Claude app on phone, desktop and web) and the
+  `pantry` CLI (for Claude Code) let your regular Claude read the kitchen, with the expiring items first
+  and your household preferences, then save recipes and add to the shopping list.
+  Set up under **Settings → Claude** (setup step 5).
+- **Recipe box:** recipes Claude saves are sorted into *Ready to make*, *Missing 1* and *Missing more*
+  from the live inventory.
 - **Add missing to list**, tagged with the recipe.
 - **Cook this:** opens Cooking mode with the recipe as a checklist; each ingredient is one
   tap (or one scan) to deduct.
-- Needs `ANTHROPIC_API_KEY` on Vercel (see setup step 5). **Re-run `supabase/schema.sql`.**
 
 ## Code map
 
@@ -52,7 +52,7 @@ what you already have.
 |---|---|
 | `src/lib/inventory.ts` | Quantity model: pure operations on packages |
 | `src/lib/shopping.ts` | Staple / low-stock / list rules |
-| `src/lib/recipes.ts` | Ingredient ↔ inventory matching, recipe API client |
+| `src/lib/recipes.ts` | Ingredient ↔ inventory matching |
 | `src/lib/categories.ts`, `shelfLife.ts` | Auto category / location / use-by rules |
 | `src/lib/lookup.ts` | Barcode lookup chain |
 | `src/lib/store.ts`, `sync.ts`, `db.ts` | Local-first storage, outbox, Supabase sync |
@@ -60,7 +60,9 @@ what you already have.
 | `src/screens/` | Kitchen, Scan, Settings, sign-in |
 | `supabase/schema.sql` | Database tables and access rules. **Re-run it in the Supabase SQL Editor after each new phase.** |
 | `api/upc.ts` | Vercel function proxying UPCitemdb |
-| `api/recipes.ts`, `api/import-recipe.ts` | Claude-powered recipe suggestions and import (structured output) |
+| `api/mcp.ts`, `api/agent.ts`, `api/_lib/agent.ts` | Claude connector (MCP) and CLI endpoint, authorized by per-household keys |
+| `cli/pantry.mjs` | `pantry` CLI (no dependencies) |
+| `.claude/skills/pantry/` | Teaches Claude Code to use the CLI |
 
 ```bash
 npm install && npm run dev   # local, device-only mode
