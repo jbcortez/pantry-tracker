@@ -3,6 +3,7 @@ import { categorize, resolveCategories } from '../../src/lib/categories.js'
 import { daysUntil, urgency } from '../../src/lib/dates.js'
 import { describeQuantity, summarize } from '../../src/lib/inventory.js'
 import { findProduct, ingredientLine, matchRecipe, type KitchenLike } from '../../src/lib/recipes.js'
+import { normalizeSupabaseUrl } from '../../src/lib/supabaseUrl.js'
 import {
   LOCATIONS,
   type CategoryDef,
@@ -30,8 +31,8 @@ export interface Snapshot {
 }
 
 function db() {
-  const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.VITE_SUPABASE_KEY
+  const url = normalizeSupabaseUrl(process.env.VITE_SUPABASE_URL)
+  const key = process.env.VITE_SUPABASE_KEY?.trim()
   if (!url || !key) throw new AgentError('Pantry sync isn’t set up on the server (see docs/SETUP.md).')
   return createClient(url, key, { auth: { persistSession: false } })
 }
