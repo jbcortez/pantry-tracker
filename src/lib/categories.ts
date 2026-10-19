@@ -1,4 +1,4 @@
-import type { CategoryDef, Location, Tracking } from './types'
+import type { CategoryDef, Location, Tracking } from './types.js'
 
 export const DEFAULT_CATEGORIES: CategoryDef[] = [
   { id: 'produce', label: 'Produce', icon: '🥕' },

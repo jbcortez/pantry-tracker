@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useState } from 'react'
+import { ClaudeConnect } from '../components/ClaudeConnect'
 import { SyncBadge } from '../components/SyncBadge'
 import { useToast } from '../components/Toast'
 import { Button, inputClass } from '../components/ui'
@@ -80,11 +81,15 @@ export function Settings() {
 
       <CategoriesCard categories={categories} onSave={(c) => void save({ categories: c })} />
 
+      <Card title="Claude">
+        <ClaudeConnect />
+      </Card>
+
       <RecipeNotesCard
         notes={household.recipe_notes ?? ''}
         onSave={(recipe_notes) => {
           void save({ recipe_notes })
-          toast({ message: 'Saved — recipes will follow this' })
+          toast({ message: 'Saved — Claude will follow this' })
         }}
       />
 
@@ -132,7 +137,9 @@ function RecipeNotesCard({ notes, onSave }: { notes: string; onSave: (n: string)
         onChange={(e) => setValue(e.target.value)}
         aria-label="Recipe preferences"
       />
-      <p className="mt-1 text-xs text-stone-500">Dietary rules and dislikes for everyone in the household.</p>
+      <p className="mt-1 text-xs text-stone-500">
+        Dietary rules and dislikes for everyone in the household. Claude sees these with your inventory.
+      </p>
       {value.trim() !== notes.trim() && (
         <Button variant="primary" className="mt-3 w-full" onClick={() => onSave(value.trim())}>
           Save preferences

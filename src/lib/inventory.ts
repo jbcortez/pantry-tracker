@@ -1,5 +1,5 @@
-import { estimateUseBy, useByAfterOpening } from './shelfLife'
-import type { Location, Product, Unit } from './types'
+import { estimateUseBy, useByAfterOpening } from './shelfLife.js'
+import type { Location, Product, Unit } from './types.js'
 
 /**
  * Pure inventory operations. Each takes the live units of one product and returns the

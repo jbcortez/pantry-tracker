@@ -87,7 +87,7 @@ create table if not exists public.recipes (
   servings integer,
   ingredients jsonb not null default '[]'::jsonb,
   steps jsonb not null default '[]'::jsonb,
-  source text not null check (source in ('ai', 'url', 'manual')),
+  source text not null,
   source_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -205,6 +205,155 @@ revoke execute on function public.create_household(text, text) from public, anon
 revoke execute on function public.join_household(text, text) from public, anon;
 grant execute on function public.create_household(text, text) to authenticated;
 grant execute on function public.join_household(text, text) to authenticated;
+
+-- ───────────────────────── Claude connector ─────────────────────────
+-- Each household can create keys that let Claude (connector or CLI) read the kitchen,
+-- save recipes and add to the shopping list. Only a hash of each key is stored.
+
+alter table public.recipes drop constraint if exists recipes_source_check;
+alter table public.recipes add constraint recipes_source_check check (source in ('ai', 'url', 'manual', 'claude'));
+
+create table if not exists public.agent_keys (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households on delete cascade,
+  key_hash text not null unique,
+  label text not null default 'Claude',
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  revoked_at timestamptz
+);
+alter table public.agent_keys enable row level security;
+drop policy if exists "members read" on public.agent_keys;
+create policy "members read" on public.agent_keys for select using (public.is_member(household_id));
+revoke all on public.agent_keys from anon, authenticated;
+grant select (id, household_id, label, created_at, last_used_at, revoked_at) on public.agent_keys to authenticated;
+
+-- pgcrypto lives in the "extensions" schema on Supabase.
+create or replace function public.create_agent_key(p_household uuid, p_label text default 'Claude')
+returns text
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  k text;
+begin
+  if not public.is_member(p_household) then
+    raise exception 'Not a member of this household';
+  end if;
+  k := 'pantry_' || encode(gen_random_bytes(24), 'hex');
+  insert into public.agent_keys (household_id, key_hash, label)
+    values (p_household, encode(digest(k, 'sha256'), 'hex'), coalesce(nullif(trim(p_label), ''), 'Claude'));
+  return k;
+end $$;
+
+create or replace function public.revoke_agent_key(p_id uuid)
+returns void
+language sql security definer set search_path = public as $$
+  update public.agent_keys set revoked_at = now()
+  where id = p_id and public.is_member(household_id) and revoked_at is null
+$$;
+
+create or replace function public.agent_household(p_key text)
+returns uuid
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  k public.agent_keys;
+begin
+  select * into k from public.agent_keys
+  where key_hash = encode(digest(coalesce(p_key, ''), 'sha256'), 'hex') and revoked_at is null;
+  if k.id is null then
+    raise exception 'Invalid or revoked Pantry key' using errcode = '28000';
+  end if;
+  if k.last_used_at is null or k.last_used_at < now() - interval '1 hour' then
+    update public.agent_keys set last_used_at = now() where id = k.id;
+  end if;
+  return k.household_id;
+end $$;
+
+create or replace function public.agent_check(p_key text)
+returns text
+language sql security definer set search_path = public as $$
+  select name from public.households where id = public.agent_household(p_key)
+$$;
+
+-- Everything Claude needs in one read: the household, what's on the shelves, the list, saved recipe titles.
+create or replace function public.agent_snapshot(p_key text)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  hid uuid := public.agent_household(p_key);
+begin
+  return jsonb_build_object(
+    'household', (select jsonb_build_object('name', h.name, 'recipe_notes', h.recipe_notes, 'categories', h.categories)
+                  from public.households h where h.id = hid),
+    'products', coalesce((select jsonb_agg(to_jsonb(p)) from public.products p
+                          where p.household_id = hid and p.deleted_at is null), '[]'::jsonb),
+    'units', coalesce((select jsonb_agg(to_jsonb(u)) from public.inventory_units u
+                       where u.household_id = hid and u.deleted_at is null), '[]'::jsonb),
+    'shopping', coalesce((select jsonb_agg(to_jsonb(s)) from public.shopping_items s
+                          where s.household_id = hid and s.deleted_at is null and s.checked_at is null), '[]'::jsonb),
+    'recipes', coalesce((select jsonb_agg(jsonb_build_object('id', r.id, 'title', r.title) order by r.title)
+                         from public.recipes r where r.household_id = hid and r.deleted_at is null), '[]'::jsonb)
+  );
+end $$;
+
+create or replace function public.agent_save_recipe(p_key text, p_recipe jsonb)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  hid uuid := public.agent_household(p_key);
+  rid uuid := gen_random_uuid();
+begin
+  if coalesce(trim(p_recipe->>'title'), '') = '' then
+    raise exception 'A recipe needs a title';
+  end if;
+  if jsonb_typeof(p_recipe->'ingredients') <> 'array' or jsonb_typeof(p_recipe->'steps') <> 'array' then
+    raise exception 'ingredients and steps must be lists';
+  end if;
+  insert into public.recipes (id, household_id, title, summary, time_minutes, servings, ingredients, steps, source, source_url)
+  values (
+    rid, hid, trim(p_recipe->>'title'), coalesce(p_recipe->>'summary', ''),
+    (p_recipe->>'time_minutes')::integer, (p_recipe->>'servings')::integer,
+    p_recipe->'ingredients', p_recipe->'steps', 'claude', nullif(p_recipe->>'source_url', '')
+  );
+  return rid;
+end $$;
+
+-- Adds items not already on the list (by product or name). Returns how many were added.
+create or replace function public.agent_add_to_list(p_key text, p_items jsonb)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  hid uuid := public.agent_household(p_key);
+  item jsonb;
+  pid uuid;
+  added integer := 0;
+begin
+  for item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+    continue when coalesce(trim(item->>'name'), '') = '';
+    select p.id into pid from public.products p
+      where p.id = nullif(item->>'product_id', '')::uuid and p.household_id = hid;
+    continue when exists (
+      select 1 from public.shopping_items s
+      where s.household_id = hid and s.deleted_at is null and s.checked_at is null
+        and ((pid is not null and s.product_id = pid) or lower(s.name) = lower(trim(item->>'name')))
+    );
+    insert into public.shopping_items (id, household_id, product_id, name, category, note, source)
+    values (gen_random_uuid(), hid, pid, trim(item->>'name'), coalesce(nullif(item->>'category', ''), 'other'),
+            nullif(item->>'note', ''), case when item->>'note' is not null then 'recipe' else 'manual' end);
+    added := added + 1;
+  end loop;
+  return added;
+end $$;
+
+revoke execute on function public.agent_household(text) from public, anon, authenticated;
+revoke execute on function public.create_agent_key(uuid, text) from public, anon;
+revoke execute on function public.revoke_agent_key(uuid) from public, anon;
+grant execute on function public.create_agent_key(uuid, text) to authenticated;
+grant execute on function public.revoke_agent_key(uuid) to authenticated;
+-- These check the key themselves, so the server can call them without a user session.
+grant execute on function public.agent_check(text) to anon, authenticated;
+grant execute on function public.agent_snapshot(text) to anon, authenticated;
+grant execute on function public.agent_save_recipe(text, jsonb) to anon, authenticated;
+grant execute on function public.agent_add_to_list(text, jsonb) to anon, authenticated;
 
 -- ───────────────────────── Live updates ─────────────────────────
 

@@ -94,3 +94,40 @@ export async function fetchMembers(householdId: string): Promise<{ user_id: stri
   if (error) throw error
   return data ?? []
 }
+
+// ───────────── Claude connection keys ─────────────
+
+export interface AgentKey {
+  id: string
+  label: string
+  created_at: string
+  last_used_at: string | null
+}
+
+export async function listAgentKeys(householdId: string): Promise<AgentKey[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('agent_keys')
+    .select('id, label, created_at, last_used_at')
+    .eq('household_id', householdId)
+    .is('revoked_at', null)
+    .order('created_at')
+  if (error) throw error
+  return data ?? []
+}
+
+/** Returns the key itself; only its hash is stored, so this is the one chance to copy it. */
+export async function createAgentKey(householdId: string, label: string): Promise<string> {
+  const { data, error } = await supabase!.rpc('create_agent_key', { p_household: householdId, p_label: label })
+  if (error) throw error
+  return data as string
+}
+
+export async function revokeAgentKey(id: string): Promise<void> {
+  const { error } = await supabase!.rpc('revoke_agent_key', { p_id: id })
+  if (error) throw error
+}
+
+export function connectorUrl(key: string): string {
+  return `${location.origin}/api/mcp?key=${key}`
+}

@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.135.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@supabase/supabase-js": "^2.118.0",
     "barcode-detector": "^3.2.2",
     "dexie": "^4.4.6",
@@ -33,5 +33,8 @@
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.5"
+  },
+  "bin": {
+    "pantry": "cli/pantry.mjs"
   }
 }
