@@ -19,17 +19,18 @@ and **Vercel** (the website host). After this, every update to the code goes liv
 3. **Create the tables:** left sidebar → **SQL Editor** → **New query**. Open
    [`supabase/schema.sql`](../supabase/schema.sql) in this repo, copy the whole file, paste
    it in, and click **Run**. You should see "Success. No rows returned".
-4. **Make sign-in emails include a code** (needed for the installed iPhone app):
-   left sidebar → **Authentication** → **Emails** → **Magic Link** template. Replace the
-   body with:
+4. **Let people sign in with a password, without a confirmation email:** left sidebar →
+   **Authentication** → **Sign In / Providers** → **Email** → turn **off** “Confirm email” → **Save**.
+   (Supabase's built-in email sender only allows a few emails an hour, so this avoids hitting
+   the limit.)
+   Optional, for the “Forgot password?” option: **Authentication** → **Emails** →
+   **Magic Link** template, replace the body with the following, and click **Save**:
 
    ```html
    <h2>Sign in to Pantry</h2>
    <p>Your code: <strong style="font-size:24px;letter-spacing:4px">{{ .Token }}</strong></p>
-   <p>Or <a href="{{ .ConfirmationURL }}">tap here to sign in</a>.</p>
    ```
 
-   Click **Save**.
 5. **Copy two values** for step 2: **Project Settings** (gear icon) → **API Keys** /
    **Data API**:
    - **Project URL**: looks like `https://abcdefgh.supabase.co`
@@ -64,7 +65,7 @@ Save. This lets the "tap here to sign in" link in the email return to your app.
 ## 4. Install on your phone
 
 1. Open your Vercel URL on your phone.
-2. Sign in with your email, entering the 6-digit code from the email.
+2. Tap **Create account** and choose a password (each person in the household makes their own).
 3. Create your kitchen.
 4. **Add to Home Screen**
    - **iPhone:** in Safari, tap Share, then **Add to Home Screen**.

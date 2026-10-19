@@ -6,6 +6,7 @@ import { Button, inputClass } from '../components/ui'
 import { useApp } from '../lib/appContext'
 import { DEFAULT_CATEGORIES } from '../lib/categories'
 import { fetchMembers, inviteLink, updateHousehold } from '../lib/household'
+import { supabase } from '../lib/supabase'
 import type { CategoryDef, Household } from '../lib/types'
 
 export function Settings() {
@@ -107,7 +108,8 @@ export function Settings() {
       {cloud && (
         <Card title="Account">
           <p className="mb-3 text-sm text-stone-600">Signed in as {email}</p>
-          <Button variant="danger" className="w-full" onClick={() => void signOut()}>
+          <SetPassword />
+          <Button variant="danger" className="mt-3 w-full" onClick={() => void signOut()}>
             Sign out
           </Button>
         </Card>
@@ -122,6 +124,56 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="mb-3 font-semibold">{title}</h2>
       {children}
     </section>
+  )
+}
+
+/** Also how accounts created with an emailed code get a password. */
+function SetPassword() {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  if (!open) {
+    return (
+      <Button className="w-full" onClick={() => setOpen(true)}>
+        Set a new password
+      </Button>
+    )
+  }
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        setBusy(true)
+        const { error } = await supabase!.auth.updateUser({ password })
+        setBusy(false)
+        if (error) {
+          toast({ message: error.message, tone: 'warn' })
+          return
+        }
+        setPassword('')
+        setOpen(false)
+        toast({ message: 'Password saved' })
+      }}
+    >
+      <input
+        type="password"
+        autoComplete="new-password"
+        className={inputClass}
+        placeholder="New password (8+ characters)"
+        aria-label="New password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <Button onClick={() => setOpen(false)}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={busy || password.length < 8}>
+          Save
+        </Button>
+      </div>
+    </form>
   )
 }
 
